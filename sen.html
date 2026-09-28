@@ -113,10 +113,15 @@
   .sent { padding: 18px 0; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; gap: 6px; }
   .sent:last-child { border-bottom: 0; }
   .sent-text {
-    flex: 1; min-width: 0; margin: 0; padding-left: 14px; border-left: 3px solid var(--accent);
+    cursor: pointer; flex: 1; min-width: 0; margin: 0; padding-left: 14px; border-left: 3px solid var(--accent);
     font-family: var(--serif); font-size: 17px; line-height: 1.85;
     white-space: pre-wrap; overflow-wrap: anywhere; max-width: 66ch;
   }
+  .sent-text:not(.open) {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+    overflow: hidden;
+  }
+  .sent-text:hover { background: var(--accent-soft); }
   .more-wrap { position: relative; flex-shrink: 0; }
   .more {
     width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
@@ -411,6 +416,8 @@
     tabs.appendChild(add);
   }
 
+  var sentOpen = {};
+
   function renderBook() {
     var b = getBook(currentBook);
     $("bk-title").textContent = b.title;
@@ -439,7 +446,23 @@
       item.className = "sent";
       var p = document.createElement("p");
       p.className = "sent-text";
+      p.tabIndex = 0;
+      p.setAttribute("role", "button");
+      var open = (sentOpen[s.id] !== undefined) ? sentOpen[s.id] : !!term;
+      if (open) p.classList.add("open");
+      p.setAttribute("aria-expanded", open ? "true" : "false");
       highlight(p, s.text, term);
+      var toggle = function () {
+        if (window.getSelection && String(window.getSelection()).length) return; // 글자를 드래그해 고르는 중이면 무시
+        var now = !p.classList.contains("open");
+        p.classList.toggle("open", now);
+        p.setAttribute("aria-expanded", now ? "true" : "false");
+        sentOpen[s.id] = now;
+      };
+      p.addEventListener("click", toggle);
+      p.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); }
+      });
       item.appendChild(p);
 
       var wrap = document.createElement("div");
