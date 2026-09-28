@@ -118,7 +118,7 @@
     white-space: pre-wrap; overflow-wrap: anywhere; max-width: 66ch;
   }
   .sent-text:not(.open) {
-    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1;
     overflow: hidden;
   }
   .sent-text:hover { background: var(--accent-soft); }
@@ -453,7 +453,8 @@
       p.setAttribute("aria-expanded", open ? "true" : "false");
       highlight(p, s.text, term);
       var toggle = function () {
-        if (window.getSelection && String(window.getSelection()).length) return; // 글자를 드래그해 고르는 중이면 무시
+        var sel = window.getSelection ? window.getSelection() : null;
+        if (sel && !sel.isCollapsed && sel.anchorNode && p.contains(sel.anchorNode)) return; // 이 문장의 글자를 드래그해 고르는 중이면 무시
         var now = !p.classList.contains("open");
         p.classList.toggle("open", now);
         p.setAttribute("aria-expanded", now ? "true" : "false");
