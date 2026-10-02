@@ -81,9 +81,59 @@
   button.small { padding: 4px 10px; font-size: 13px; }
   button.danger.armed { background: var(--danger); border-color: var(--danger); color: #fff; }
 
+  .tabs-bar { display: flex; align-items: stretch; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+  .all-btn {
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    width: 42px; border: 0; border-right: 1px solid var(--line); border-radius: 0;
+    background: transparent; color: var(--muted); padding: 0;
+  }
+  .all-btn:hover { color: var(--accent); background: var(--accent-soft); }
+  .all-btn svg { width: 19px; height: 19px; }
+
+  .picker {
+    position: fixed; inset: 0; z-index: 50; background: rgba(20,20,16,.45);
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .picker[hidden] { display: none; }
+  .picker-sheet {
+    width: 100%; max-width: 520px; max-height: 82vh; background: var(--card);
+    border-radius: 16px 16px 0 0; padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 12px);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .picker-head { display: flex; align-items: center; justify-content: space-between; font-family: var(--serif); font-size: 17px; font-weight: 700; }
+  .picker-close { border: 0; background: transparent; font-size: 22px; line-height: 1; padding: 2px 6px; color: var(--muted); }
+  .picker-body { display: flex; gap: 8px; overflow: hidden; flex: 1; min-height: 0; }
+  .picker-list { flex: 1; overflow-y: auto; min-height: 0; }
+  .picker-group-label { font-family: var(--serif); font-weight: 700; color: var(--accent); font-size: 13px; padding: 10px 4px 4px; position: sticky; top: 0; background: var(--card); }
+  .picker-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; text-align: left; border: 0; border-radius: 6px; padding: 10px 8px;
+    background: transparent; color: var(--ink); font-family: var(--serif); font-size: 15px;
+  }
+  .picker-item:hover { background: var(--accent-soft); }
+  .picker-item[aria-current="true"] { background: var(--accent-soft); font-weight: 700; }
+  .picker-item .pc { color: var(--muted); font-family: var(--sans); font-size: 12px; font-weight: 400; flex-shrink: 0; }
+  .picker-add {
+    display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
+    border: 0; border-radius: 6px; padding: 10px 8px; margin-top: 6px;
+    background: transparent; color: var(--accent); font-size: 14px; font-weight: 500;
+  }
+  .picker-add:hover { background: var(--accent-soft); }
+  .picker-empty { padding: 24px 8px; text-align: center; color: var(--muted); font-size: 14px; }
+  .picker-index {
+    flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; overflow-y: auto;
+    padding-left: 4px; border-left: 1px solid var(--line);
+  }
+  .picker-index button {
+    border: 0; background: transparent; color: var(--faint); font-family: var(--serif); font-weight: 700;
+    font-size: 12px; padding: 3px 6px; border-radius: 4px; min-width: 26px;
+  }
+  .picker-index button:hover { color: var(--accent); background: var(--accent-soft); }
+  .picker-index button.off { opacity: .35; pointer-events: none; }
+
   .tabs {
-    position: relative; display: flex; overflow-x: auto; margin: 0 0 24px;
-    border-bottom: 1px solid var(--line); scrollbar-width: thin;
+    position: relative; display: flex; overflow-x: auto; flex: 1; min-width: 0;
+    scrollbar-width: thin;
   }
   .tab {
     flex-shrink: 0; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -171,7 +221,26 @@
     <span class="muted" id="home-count"></span>
   </div>
 
-  <nav class="tabs" id="tabs" role="tablist" aria-label="책"></nav>
+  <div class="tabs-bar">
+    <button type="button" class="all-btn" id="all-btn" aria-haspopup="dialog" title="전체 책 보기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 19V5a2 2 0 0 1 2-2h12a1 1 0 0 1 1 1v14"/><path d="M4 19a2 2 0 0 0 2 2h13"/><path d="M4 19a2 2 0 0 1 2-2h13"/></svg>
+    </button>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="책"></nav>
+  </div>
+
+  <div class="picker" id="picker" hidden role="dialog" aria-modal="true" aria-label="전체 책">
+    <div class="picker-sheet">
+      <div class="picker-head">
+        <span>전체 책</span>
+        <button type="button" class="picker-close" id="picker-close" aria-label="닫기">×</button>
+      </div>
+      <input type="search" id="picker-q" placeholder="책 제목 검색" aria-label="책 검색">
+      <div class="picker-body">
+        <div class="picker-list" id="picker-list"></div>
+        <nav class="picker-index" id="picker-index" aria-label="자음 색인"></nav>
+      </div>
+    </div>
+  </div>
 
   <!-- 책 추가 -->
   <section id="view-add" hidden>
@@ -354,6 +423,17 @@
     return data.books.slice().sort(function (a, b) { return collator.compare(a.title, b.title); });
   }
 
+  var RECENT_LIMIT = 6;
+  function recentBooks() {
+    var sorted = data.books.slice().sort(function (a, b) { return (b.lastOpened || b.created || 0) - (a.lastOpened || a.created || 0); });
+    if (currentBook) {
+      var cur = getBook(currentBook);
+      sorted = sorted.filter(function (b) { return b.id !== currentBook; });
+      if (cur) sorted.unshift(cur);
+    }
+    return sorted.slice(0, RECENT_LIMIT);
+  }
+
   function route(initial) {
     var h = location.hash || "";
     var tab = null;
@@ -368,7 +448,11 @@
     }
     currentTab = tab;
     currentBook = tab === "add" ? null : tab;
-    if (currentBook) { try { localStorage.setItem(KEY_LAST, currentBook); } catch (e) {} }
+    if (currentBook) {
+      try { localStorage.setItem(KEY_LAST, currentBook); } catch (e) {}
+      var cb = getBook(currentBook);
+      if (cb) { cb.lastOpened = Date.now(); persist(); }
+    }
     render();
     revealTab();
     if (!initial) window.scrollTo(0, 0);
@@ -397,7 +481,7 @@
   function renderTabs() {
     var tabs = $("tabs");
     tabs.textContent = "";
-    sortedBooks().forEach(function (b) {
+    recentBooks().forEach(function (b) {
       var a = document.createElement("a");
       a.className = "tab";
       a.href = "#b-" + b.id;
@@ -417,6 +501,96 @@
   }
 
   var sentOpen = {};
+
+  /* ---------- 전체 책 보기 (자음 색인 + 검색) ---------- */
+  var CHO = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+  var JAMO_BASE = { "ㄲ": "ㄱ", "ㄸ": "ㄷ", "ㅃ": "ㅂ", "ㅆ": "ㅅ", "ㅉ": "ㅈ" };
+  var PICKER_GROUPS = ["ㄱ","ㄴ","ㄷ","ㄹ","ㅁ","ㅂ","ㅅ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ","기타"];
+
+  function bookInitial(title) {
+    var c = (title || "").trim().charCodeAt(0);
+    if (c >= 0xAC00 && c <= 0xD7A3) {
+      var cho = CHO[Math.floor((c - 0xAC00) / 588)];
+      return JAMO_BASE[cho] || cho;
+    }
+    if (c >= 0x3131 && c <= 0x314E) {
+      var ch = title.trim().charAt(0);
+      return JAMO_BASE[ch] || (PICKER_GROUPS.indexOf(ch) > -1 ? ch : "기타");
+    }
+    return "기타";
+  }
+
+  function openPicker() {
+    $("picker-q").value = "";
+    renderPicker();
+    $("picker").hidden = false;
+    $("picker-q").focus();
+  }
+  function closePicker() { $("picker").hidden = true; }
+
+  function renderPicker() {
+    var term = $("picker-q").value.trim();
+    var t = term.toLowerCase();
+    var all = sortedBooks();
+    var shown = all.filter(function (b) { return !t || b.title.toLowerCase().indexOf(t) > -1 || (b.author || "").toLowerCase().indexOf(t) > -1; });
+
+    var buckets = {};
+    PICKER_GROUPS.forEach(function (g) { buckets[g] = []; });
+    shown.forEach(function (b) { buckets[bookInitial(b.title)].push(b); });
+
+    var idx = $("picker-index");
+    idx.textContent = "";
+    PICKER_GROUPS.forEach(function (g) {
+      var btn = document.createElement("button");
+      btn.type = "button"; btn.textContent = g;
+      if (buckets[g].length) {
+        btn.addEventListener("click", function () {
+          var el = document.getElementById("pg-" + PICKER_GROUPS.indexOf(g));
+          if (el) el.scrollIntoView({ block: "start" });
+        });
+      } else { btn.className = "off"; btn.disabled = true; }
+      idx.appendChild(btn);
+    });
+
+    var list = $("picker-list");
+    list.textContent = "";
+    if (!shown.length) {
+      var empty = document.createElement("div");
+      empty.className = "picker-empty";
+      empty.textContent = all.length ? "검색 결과가 없어요." : "아직 등록한 책이 없어요.";
+      list.appendChild(empty);
+    } else {
+      PICKER_GROUPS.forEach(function (g, gi) {
+        var arr = buckets[g];
+        if (!arr.length) return;
+        var label = document.createElement("div");
+        label.className = "picker-group-label"; label.id = "pg-" + gi; label.textContent = g;
+        list.appendChild(label);
+        arr.forEach(function (b) {
+          var item = document.createElement("button");
+          item.type = "button"; item.className = "picker-item";
+          if (b.id === currentTab) item.setAttribute("aria-current", "true");
+          var left = document.createElement("span"); left.textContent = b.title;
+          var right = document.createElement("span"); right.className = "pc"; right.textContent = countOf(b.id) + "개";
+          item.appendChild(left); item.appendChild(right);
+          item.addEventListener("click", function () { closePicker(); location.hash = "#b-" + b.id; });
+          list.appendChild(item);
+        });
+      });
+    }
+    var addBtn = document.createElement("button");
+    addBtn.type = "button"; addBtn.className = "picker-add";
+    addBtn.innerHTML = '<span style="font-size:16px">+</span> 새 책 추가';
+    addBtn.addEventListener("click", function () { closePicker(); location.hash = "#add"; });
+    list.appendChild(addBtn);
+  }
+
+  $("all-btn").addEventListener("click", openPicker);
+  $("picker-close").addEventListener("click", closePicker);
+  $("picker").addEventListener("click", function (ev) { if (ev.target === $("picker")) closePicker(); });
+  $("picker-q").addEventListener("input", renderPicker);
+  document.addEventListener("keydown", function (ev) { if (ev.key === "Escape" && !$("picker").hidden) closePicker(); });
+
 
   function renderBook() {
     var b = getBook(currentBook);
@@ -675,7 +849,7 @@
   });
 
   window.addEventListener("hashchange", function () {
-    resetSentenceForm(); $("s-q").value = ""; $("book-edit").hidden = true; route(false);
+    resetSentenceForm(); $("s-q").value = ""; $("book-edit").hidden = true; closePicker(); route(false);
   });
 
   load();
