@@ -132,8 +132,9 @@
   .picker-index button.off { opacity: .35; pointer-events: none; }
 
   .tabs {
-    position: relative; display: flex; overflow-x: auto; flex: 1; min-width: 0;
-    scrollbar-width: thin;
+    position: relative; display: flex; overflow-x: auto; overflow-y: hidden; flex: 1; min-width: 0;
+    scrollbar-width: thin; touch-action: pan-x; -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
   }
   .tab {
     flex-shrink: 0; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
